@@ -10,3 +10,4 @@ void initOutput();
 void writeDescription();
 void addDescription(YAML::Node &root);
 void plot(const Aero& data, int ord);
+void updateEndFrame(int new_ord);

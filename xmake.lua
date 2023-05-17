@@ -1,5 +1,5 @@
 add_rules("mode.debug", "mode.release")
-add_requires("yaml-cpp", "eigen", "fmt")	--to get the package 'name'
+add_requires("yaml-cpp", "eigen", "fmt", "onetbb", "openmp")	--to get the package 'name'
 set_languages("cxxlatest")	--set the configure language
 
 if is_mode("debug") then
@@ -17,3 +17,6 @@ target("aero")	--set target
 	add_files("app/*.cpp")
 	add_includedirs("physx-common/Util")
 	add_packages("yaml-cpp", "eigen", "fmt")
+	if is_mode("release") then
+        add_packages("onetbb", "openmp")
+    end

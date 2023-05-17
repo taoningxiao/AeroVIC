@@ -22,8 +22,15 @@ public:
 
     void simulate(double dt);
     void advect(double dt);
+    void vortexP2G(double dt);
     void diffusion(double dt);
     void calVelocity(double dt);
     void boundaryPenalty(double dt);
     void calVortex(double dt);
+    void vortexG2P(double dt);
+
+    /* for space hashing */
+    std::vector<std::vector<int>> grid_particles;
+    std::vector<std::vector<Vec2i>> particle_grids;
+    void buildGridTable();
 };

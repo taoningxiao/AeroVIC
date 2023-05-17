@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#define M_PI 3.1415926
 class M4Kernel {
 public:
     double radius;

@@ -1,6 +1,7 @@
 #include "viewer.h"
 #include "args.h"
 #include "timer.h"
+#include <filesystem>
 
 void initOutput() {
     std::filesystem::remove_all("output");

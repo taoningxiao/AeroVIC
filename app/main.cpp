@@ -18,6 +18,7 @@ int main(int argc, char * argv[]) {
     Vec2i size(int(config["width"].as<double>()/spacing), int(config["height"].as<double>()/spacing));
     Vec2d origin;
     for (int i = 0; i < 2; i++) origin[i] =  - size[i] * spacing / 2;
+    origin.x() /= 2;
     Aero sim(origin, size, spacing);
 
     const int FRAMES   = config["simulation-time"].as<double>() / config["time-step"].as<double>();
@@ -25,7 +26,7 @@ int main(int argc, char * argv[]) {
 
     myClock["total"].start();
     for (int i : tq::trange(FRAMES)) {
-        // if (i == 110) {
+        // if (i == 51) {
         //     std::cout << fmt::format("current frame = {}\n", i);
         // }
         sim.simulate(config["time-step"].as<double>());

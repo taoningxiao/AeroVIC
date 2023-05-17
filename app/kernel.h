@@ -4,11 +4,14 @@
 class M4Kernel {
 public:
     double radius;
-    M4Kernel(double _radius): radius(_radius) {};
-    double operator ()(double dist) const {
-        double v = std::abs(dist) / radius;
-        if (v > 2) return 0;
-        else if (v >= 1) return (2 - v)*(2 - v)*(1 - v)/2;
-        else return 1 - 5*v*v/2 + 3*v*v*v/2;
+    double h2, h3;
+    M4Kernel(double _radius):
+        radius(_radius), h2(_radius * _radius), h3(_radius * _radius * _radius) {};
+    double operator()(double dist) const {
+        if (dist > radius) return 0;
+        else {
+            double x = 1 - dist * dist / h2;
+            return 315 / (64 * M_PI * h3) * x * x * x;
+        }
     }
 };

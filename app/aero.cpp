@@ -42,6 +42,7 @@ Aero::Aero(Vec2d _origin, Vec2i _size, double _spacing):
         for (int k = 0; k < config["particles-per-cell"].as<int>(); k++) {
             // sample.position = ori_pos + Vec2d(dist(rd), dist(rd)) * spacing;
             sample.position                                                  = ori_pos + Vec2d(dist(gen), dist(gen)) * spacing;
+            // sample.color = std::abs(sample.position.y()) / (2 * spacing * size.y());
             vortex_particles[t * config["particles-per-cell"].as<int>() + k] = sample;
         }
     }
@@ -64,39 +65,46 @@ Aero::Aero(Vec2d _origin, Vec2i _size, double _spacing):
 void Aero::simulate(double dt) {
     myClock["simulate"].start();
     advect(dt);
-    // buildGridTable();
-    // vortexP2G(dt);
+    buildGridTable();
+    vortexP2G(dt);
     calVelocity(dt);
     boundaryPenalty(dt);
     calVortex(dt);
     diffusion(dt);
-    // vortexG2P(dt);
+    vortexG2P(dt);
     myClock["simulate"].stop();
 }
 
 void Aero::advect(double dt) {
     myClock["simulate/advect"].start();
-    // for (auto & particle : vortex_particles) {
-    //     // if (particle.vortex != 0) continue;
-    //     double vecX         = velocityX.interpolate(particle.position);
-    //     double vecY         = velocityY.interpolate(particle.position);
-    //     auto   new_position = particle.position + Vec2d(vecX, vecY) * dt;
-    //     if (! inside(new_position)) {
-    //         particle.position *= -1;
-    //         particle.vortex = 0;
-    //     } else particle.position = new_position;
-    // }
-    std::vector<double> tmp(vortexNode.size.x() * vortexNode.size.y());
-    for (int i = 0; i < vortexNode.size.x(); i++) {
-        for (int j = 0; j < vortexNode.size.y(); j++) {
-            Vec2d  pos                          = vortexNode.tri2pos(Vec2i(i, j));
-            double vecX                         = velocityX.interpolate(pos);
-            double vecY                         = velocityY.interpolate(pos);
-            Vec2d  new_pos                      = pos - Vec2d(vecX, vecY) * dt;
-            tmp[vortexNode.getIdx(Vec2i(i, j))] = vortexNode.interpolate(new_pos);
-        }
+    double                                 r = config["radius"].as<double>();
+    std::random_device                     rd;
+    std::uniform_real_distribution<double> dist(0, 1);
+    for (auto & particle : vortex_particles) {
+        // if (particle.vortex != 0) continue;
+        Vec2d vec1(velocityX.interpolate(particle.position), velocityY.interpolate(particle.position));
+        Vec2d vec2(velocityX.interpolate(particle.position + vec1 * dt / 2), velocityY.interpolate(particle.position + vec1 * dt / 2));
+        Vec2d vec3(velocityX.interpolate(particle.position + vec2 * dt / 2), velocityY.interpolate(particle.position + vec2 * dt / 2));
+        Vec2d vec4(velocityX.interpolate(particle.position + vec3 * dt), velocityY.interpolate(particle.position + vec3 * dt));
+        auto  new_position = particle.position + dt * (vec1 + 2 * vec2 + 3 * vec3 + vec4) / 6;
+        if (! inside(new_position)) {
+            particle.position.x() = origin.x();
+            particle.position.y() = origin.y() + dist(rd) * size.y() * spacing;
+            particle.vortex       = 0;
+            // particle.color = std::abs(particle.position.y()) / (2 * spacing * size.y());
+        } else particle.position = new_position;
     }
-    for (int i = 0; i < vortexNode.size.x() * vortexNode.size.y(); i++) vortexNode.scalarV[i] = tmp[i];
+    // std::vector<double> tmp(vortexNode.size.x() * vortexNode.size.y());
+    // for (int i = 0; i < vortexNode.size.x(); i++) {
+    //     for (int j = 0; j < vortexNode.size.y(); j++) {
+    //         Vec2d  pos                          = vortexNode.tri2pos(Vec2i(i, j));
+    //         double vecX                         = velocityX.interpolate(pos);
+    //         double vecY                         = velocityY.interpolate(pos);
+    //         Vec2d  new_pos                      = pos - Vec2d(vecX, vecY) * dt;
+    //         tmp[vortexNode.getIdx(Vec2i(i, j))] = vortexNode.interpolate(new_pos);
+    //     }
+    // }
+    // for (int i = 0; i < vortexNode.size.x() * vortexNode.size.y(); i++) vortexNode.scalarV[i] = tmp[i];
     myClock["simulate/advect"].stop();
 }
 
@@ -122,7 +130,7 @@ void Aero::buildGridTable() {
 
 void Aero::vortexP2G(double dt) {
     myClock["simulate/vortexP2G"].start();
-    M4Kernel kernel(spacing);
+    M4Kernel kernel(spacing * 2);
     double   radius = config["radius"].as<double>();
     parallelFor(0, int(vortexNode.size.x() * vortexNode.size.y()), [&](int t) {
         int  i       = t % vortexNode.size.x();
@@ -131,30 +139,29 @@ void Aero::vortexP2G(double dt) {
         auto cur_pos = vortexNode.tri2pos(Vec2i(i, j));
 
         vortexNode.scalarV[idx] = 0;
-        if (cur_pos.norm() > radius) {
-            double w = 0;
 
-            // for (int particleIdx = 0; particleIdx < vortex_particles.size(); particleIdx++) {
-            //     auto & particle = vortex_particles[particleIdx];
-            //     double v        = kernel((particle.position - cur_pos).x()) * kernel((particle.position - cur_pos).y());
-            //     vortexNode.scalarV[idx] += v * particle.vortex;
-            //     w += v;
-            //     if (v != 0) {
-            //         auto it = std::find(grid_particles[idx].begin(), grid_particles[idx].end(), particleIdx);
-            //         if (it == grid_particles[idx].end()) {
-            //             std::cout << fmt::format("Error: Particle {} which locate at ({}, {}) not in grid_particles[{}] which locate at ({}, {})\n", particleIdx, particle.position.x(), particle.position.y(), idx, cur_pos.x(), cur_pos.y());
-            //         }
-            //     }
-            // }
-            for (const auto & particleIdx : grid_particles[idx]) {
-                auto & particle = vortex_particles[particleIdx];
-                vortexNode.scalarV[idx] += kernel((particle.position - cur_pos).x()) * kernel((particle.position - cur_pos).y()) * particle.vortex;
-                w += kernel((particle.position - cur_pos).x()) * kernel((particle.position - cur_pos).y());
-            }
+        double w = 0;
 
-            if (w != 0) vortexNode.scalarV[idx] /= w;
-            if (std::abs(vortexNode.scalarV[idx]) < EPS) vortexNode.scalarV[idx] = 0;
+        // for (int particleIdx = 0; particleIdx < vortex_particles.size(); particleIdx++) {
+        //     auto & particle = vortex_particles[particleIdx];
+        //     double v        = kernel((particle.position - cur_pos).x()) * kernel((particle.position - cur_pos).y());
+        //     vortexNode.scalarV[idx] += v * particle.vortex;
+        //     w += v;
+        //     if (v != 0) {
+        //         auto it = std::find(grid_particles[idx].begin(), grid_particles[idx].end(), particleIdx);
+        //         if (it == grid_particles[idx].end()) {
+        //             std::cout << fmt::format("Error: Particle {} which locate at ({}, {}) not in grid_particles[{}] which locate at ({}, {})\n", particleIdx, particle.position.x(), particle.position.y(), idx, cur_pos.x(), cur_pos.y());
+        //         }
+        //     }
+        // }
+        for (const auto & particleIdx : grid_particles[idx]) {
+            auto & particle = vortex_particles[particleIdx];
+            vortexNode.scalarV[idx] += kernel((particle.position - cur_pos).norm()) * particle.vortex;
+            w += kernel((particle.position - cur_pos).norm());
         }
+
+        if (w != 0) vortexNode.scalarV[idx] /= w;
+        if (std::abs(vortexNode.scalarV[idx]) < EPS) vortexNode.scalarV[idx] = 0;
     });
     myClock["simulate/vortexP2G"].stop();
 }
@@ -433,14 +440,14 @@ void Aero::calVortex(double dt) {
 
 void Aero::vortexG2P(double dt) {
     myClock["simulate/vortexG2P"].start();
-    M4Kernel kernel(spacing);
+    M4Kernel kernel(spacing * 2);
     parallelFor(0, int(vortex_particles.size()), [&](int idx) {
         auto & particle = vortex_particles[idx];
         double w        = 0;
         particle.vortex = 0;
         for (const auto tri : particle_grids[idx]) {
-            particle.vortex += kernel((particle.position - vortexNode.tri2pos(tri)).x()) * kernel((particle.position - vortexNode.tri2pos(tri)).y()) * vortexNode[tri];
-            w += kernel((particle.position - vortexNode.tri2pos(tri)).x()) * kernel((particle.position - vortexNode.tri2pos(tri)).y());
+            particle.vortex += kernel((particle.position - vortexNode.tri2pos(tri)).norm()) * vortexNode[tri];
+            w += kernel((particle.position - vortexNode.tri2pos(tri)).norm());
         }
         // for (int i = 0; i < vortexNode.size.x(); i++) {
         //     for (int j = 0; j < vortexNode.size.y(); j++) {

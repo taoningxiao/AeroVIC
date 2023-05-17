@@ -33,4 +33,7 @@ public:
     std::vector<std::vector<int>> grid_particles;
     std::vector<std::vector<Vec2i>> particle_grids;
     void buildGridTable();
+
+    /* for flip */
+    std::vector<double> vortex_change;
 };

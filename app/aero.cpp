@@ -407,6 +407,8 @@ void Aero::boundaryPenalty(double dt) {
 
 void Aero::calVortex(double dt) {
     myClock["simulate/calVortex"].start();
+    vortex_change.resize(vortexNode.size.x() * vortexNode.size.y());
+    std::fill(vortex_change.begin(), vortex_change.end(), 0);
     for (int i = 1; i < vortexNode.size.x() - 1; i++) {
         for (int j = 1; j < vortexNode.size.y() - 1; j++) {
             // Vec2d pos_right = vortexNode.tri2pos(Vec2i(i, j)) + Vec2d(0.5, 0) * spacing;
@@ -431,6 +433,7 @@ void Aero::calVortex(double dt) {
             Vec2i  tri_up   = Vec2i(i, j);
             double gradX    = (velocityX[tri_up] - velocityX[tri_down]) / spacing;
 
+            vortex_change[vortexNode.getIdx(Vec2i(i, j))] = (gradY - gradX) - vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))];
             vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))] = gradY - gradX;
             if (std::abs(vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))]) < EPS) vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))] = 0;
         }
@@ -444,9 +447,11 @@ void Aero::vortexG2P(double dt) {
     parallelFor(0, int(vortex_particles.size()), [&](int idx) {
         auto & particle = vortex_particles[idx];
         double w        = 0;
-        particle.vortex = 0;
+        // particle.vortex = 0;
+        double change = 0;
         for (const auto tri : particle_grids[idx]) {
-            particle.vortex += kernel((particle.position - vortexNode.tri2pos(tri)).norm()) * vortexNode[tri];
+            int cur_idx = vortexNode.getIdx(tri);
+            change += kernel((particle.position - vortexNode.tri2pos(tri)).norm()) * vortex_change[cur_idx];
             w += kernel((particle.position - vortexNode.tri2pos(tri)).norm());
         }
         // for (int i = 0; i < vortexNode.size.x(); i++) {
@@ -462,8 +467,9 @@ void Aero::vortexG2P(double dt) {
         //         }
         //     }
         // }
-        if (w != 0) particle.vortex /= w;
-        if (std::abs(particle.vortex) < EPS) particle.vortex = 0;
+        if (w != 0) change /= w;
+        if (std::abs(change) < EPS) change = 0;
+        particle.vortex += change;
     });
     myClock["simulate/vortexG2P"].stop();
 }

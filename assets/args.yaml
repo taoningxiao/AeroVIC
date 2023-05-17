@@ -1,11 +1,11 @@
 # grid setting
 width: 8
 height: 4
-spacing: 0.02
+spacing: 0.01
 
 # simulation setting
 time-step: 0.01
-simulation-time: 20.0
+simulation-time: 50.0
 particles-per-cell: 10
 
 # viewer setting

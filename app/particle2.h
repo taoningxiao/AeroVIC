@@ -5,5 +5,5 @@ class Particle {
 public:
     double vortex;
     Vec2d position;
-    // double color;
+    double color;
 };

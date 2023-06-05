@@ -42,7 +42,7 @@ Aero::Aero(Vec2d _origin, Vec2i _size, double _spacing):
         for (int k = 0; k < config["particles-per-cell"].as<int>(); k++) {
             // sample.position = ori_pos + Vec2d(dist(rd), dist(rd)) * spacing;
             sample.position                                                  = ori_pos + Vec2d(dist(gen), dist(gen)) * spacing;
-            // sample.color = std::abs(sample.position.y()) / (2 * spacing * size.y());
+            sample.color                                                     = 2 * std::abs(sample.position.y()) / (spacing * size.y()) * 0.8;
             vortex_particles[t * config["particles-per-cell"].as<int>() + k] = sample;
         }
     }
@@ -91,6 +91,7 @@ void Aero::advect(double dt) {
             particle.position.x() = origin.x();
             particle.position.y() = origin.y() + dist(rd) * size.y() * spacing;
             particle.vortex       = 0;
+            particle.color        = 2 * std::abs(particle.position.y()) / (spacing * size.y()) * 0.8;
             // particle.color = std::abs(particle.position.y()) / (2 * spacing * size.y());
         } else particle.position = new_position;
     }
@@ -130,7 +131,7 @@ void Aero::buildGridTable() {
 
 void Aero::vortexP2G(double dt) {
     myClock["simulate/vortexP2G"].start();
-    M4Kernel kernel(spacing * 2);
+    M4Kernel kernel(config["kernel-radius"].as<double>());
     double   radius = config["radius"].as<double>();
     parallelFor(0, int(vortexNode.size.x() * vortexNode.size.y()), [&](int t) {
         int  i       = t % vortexNode.size.x();
@@ -157,10 +158,15 @@ void Aero::vortexP2G(double dt) {
         for (const auto & particleIdx : grid_particles[idx]) {
             auto & particle = vortex_particles[particleIdx];
             vortexNode.scalarV[idx] += kernel((particle.position - cur_pos).norm()) * particle.vortex;
+            vortexNode.color[idx] += kernel((particle.position - cur_pos).norm()) * particle.color;
             w += kernel((particle.position - cur_pos).norm());
         }
 
-        if (w != 0) vortexNode.scalarV[idx] /= w;
+        if (w != 0) {
+            vortexNode.scalarV[idx] /= w;
+            vortexNode.color[idx] /= w;
+            if (cur_pos.norm() <= radius) vortexNode.color[idx] = 0;
+        }
         if (std::abs(vortexNode.scalarV[idx]) < EPS) vortexNode.scalarV[idx] = 0;
     });
     myClock["simulate/vortexP2G"].stop();
@@ -433,7 +439,7 @@ void Aero::calVortex(double dt) {
             Vec2i  tri_up   = Vec2i(i, j);
             double gradX    = (velocityX[tri_up] - velocityX[tri_down]) / spacing;
 
-            vortex_change[vortexNode.getIdx(Vec2i(i, j))] = (gradY - gradX) - vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))];
+            vortex_change[vortexNode.getIdx(Vec2i(i, j))]      = (gradY - gradX) - vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))];
             vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))] = gradY - gradX;
             if (std::abs(vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))]) < EPS) vortexNode.scalarV[vortexNode.getIdx(Vec2i(i, j))] = 0;
         }
@@ -443,7 +449,7 @@ void Aero::calVortex(double dt) {
 
 void Aero::vortexG2P(double dt) {
     myClock["simulate/vortexG2P"].start();
-    M4Kernel kernel(spacing * 2);
+    M4Kernel kernel(config["kernel-radius"].as<double>());
     parallelFor(0, int(vortex_particles.size()), [&](int idx) {
         auto & particle = vortex_particles[idx];
         double w        = 0;

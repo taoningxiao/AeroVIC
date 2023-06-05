@@ -11,6 +11,7 @@ public:
     double spacing;
     Grid2(Vec2d _origin, Vec2i _size, double _spacing);
     std::vector<double> scalarV;
+    std::vector<double> color;
     double              operator[](Vec2i tri) const {
         if (inside(tri)) return scalarV[tri.y() * size.x() + tri.x()];
         else {

@@ -5,6 +5,7 @@
 Grid2::Grid2(Vec2d _origin, Vec2i _size, double _spacing):
     origin(_origin), size(_size), spacing(_spacing) {
     scalarV.resize(size.x() * size.y(), 0);
+    color.resize(size.x()*size.y(), 0);
 }
 
 Vec2i Grid2::pos2tri(const Vec2d& pos) const{

@@ -37,28 +37,28 @@ void addDescription(YAML::Node & root) {
             YAML::Node obj;
             obj["name"]                 = "triangle_mesh";
             obj["data_mode"]            = "dynamic";
-            obj["primitive_type"]       = "line_list";
+            obj["primitive_type"]       = "triangle_list";
             obj["indexed"]              = false;
             obj["color_map"]["enabled"] = true;
-            // obj["color_map"]["normalized"] = true;
+            if (config["show-flow"].as<bool>()) obj["color_map"]["normalized"] = true;
             root["objects"].push_back(obj);
         }
         if (config["show-velX-grid"].as<bool>()) {
             YAML::Node obj;
-            obj["name"]                    = "velx_grid";
-            obj["data_mode"]               = "dynamic";
-            obj["primitive_type"]          = "line_list";
-            obj["indexed"]                 = false;
+            obj["name"]           = "velx_grid";
+            obj["data_mode"]      = "dynamic";
+            obj["primitive_type"] = "line_list";
+            obj["indexed"]        = false;
             // obj["color_map"]["enabled"]    = true;
             // obj["color_map"]["normalized"] = true;
             root["objects"].push_back(obj);
         }
         if (config["show-velY-grid"].as<bool>()) {
             YAML::Node obj;
-            obj["name"]                    = "vely_grid";
-            obj["data_mode"]               = "dynamic";
-            obj["primitive_type"]          = "line_list";
-            obj["indexed"]                 = false;
+            obj["name"]           = "vely_grid";
+            obj["data_mode"]      = "dynamic";
+            obj["primitive_type"] = "line_list";
+            obj["indexed"]        = false;
             // obj["color_map"]["enabled"]    = true;
             // obj["color_map"]["normalized"] = true;
             root["objects"].push_back(obj);
@@ -163,65 +163,147 @@ void plot(const Aero & data, int ord) {
             fmt::format("output/frames/{}/triangle_mesh.mesh", ord);
         std::ofstream fout(mesh_dir, std::ios::binary);
 
-        int num = ((data.size.x()) * (data.size.y() + 1) + (data.size.y()) * (data.size.x() + 1)) * 2;
-        // int num = (data.size.y() - 1) * data.size.x();
+        // int num = ((data.size.x()) * (data.size.y() + 1) + (data.size.y()) * (data.size.x() + 1)) * 2;
+        // // int num = (data.size.y() - 1) * data.size.x();
+        // fout.write((char *) (&num), 4);
+        int num = (data.size.x() * data.size.y() * 2) * 3;
         fout.write((char *) (&num), 4);
 
         for (int i = 0; i < data.size.x(); i++) {
-            for (int j = 0; j < data.size.y() + 1; j++) {
-                Vec2i start_tri(i, j);
-                Vec2d start_pos = data.vortexNode.tri2pos(start_tri);
-                for (int k = 0; k < 2; k++) {
-                    float v = (float) (start_pos[k]);
-                    fout.write((char *) (&v), 4);
-                }
-                Vec2i end_tri(i + 1, j);
-                Vec2d end_pos = data.vortexNode.tri2pos(end_tri);
-                for (int k = 0; k < 2; k++) {
-                    float v = (float) (end_pos[k]);
-                    fout.write((char *) (&v), 4);
-                }
-            }
-        }
-
-        for (int i = 0; i < data.size.x() + 1; i++) {
             for (int j = 0; j < data.size.y(); j++) {
-                Vec2i start_tri(i, j);
-                Vec2d start_pos = data.vortexNode.tri2pos(start_tri);
+                Vec2i tri0(i, j);
+                Vec2i tri1(i + 1, j);
+                Vec2i tri2(i, j + 1);
+                Vec2i tri3(i + 1, j + 1);
+
+                Vec2d pos0 = data.vortexNode.tri2pos(tri0);
+                Vec2d pos1 = data.vortexNode.tri2pos(tri1);
+                Vec2d pos2 = data.vortexNode.tri2pos(tri2);
+                Vec2d pos3 = data.vortexNode.tri2pos(tri3);
+
                 for (int k = 0; k < 2; k++) {
-                    float v = (float) (start_pos[k]);
+                    float v = (float) (pos0[k]);
                     fout.write((char *) (&v), 4);
                 }
-                Vec2i end_tri(i, j + 1);
-                Vec2d end_pos = data.vortexNode.tri2pos(end_tri);
                 for (int k = 0; k < 2; k++) {
-                    float v = (float) (end_pos[k]);
+                    float v = (float) (pos1[k]);
+                    fout.write((char *) (&v), 4);
+                }
+                for (int k = 0; k < 2; k++) {
+                    float v = (float) (pos2[k]);
+                    fout.write((char *) (&v), 4);
+                }
+
+                for (int k = 0; k < 2; k++) {
+                    float v = (float) (pos1[k]);
+                    fout.write((char *) (&v), 4);
+                }
+                for (int k = 0; k < 2; k++) {
+                    float v = (float) (pos3[k]);
+                    fout.write((char *) (&v), 4);
+                }
+                for (int k = 0; k < 2; k++) {
+                    float v = (float) (pos2[k]);
                     fout.write((char *) (&v), 4);
                 }
             }
         }
 
         for (int i = 0; i < data.size.x(); i++) {
-            for (int j = 0; j < data.size.y() + 1; j++) {
-                Vec2i start_tri(i, j);
-                float v = (float) (data.vortexNode[start_tri]);
-                fout.write((char *) (&v), 4);
-                Vec2i end_tri(i + 1, j);
-                v = (float) (data.vortexNode[end_tri]);
-                fout.write((char *) (&v), 4);
+            for (int j = 0; j < data.size.y(); j++) {
+                Vec2i tri0(i, j);
+                Vec2i tri1(i + 1, j);
+                Vec2i tri2(i, j + 1);
+                Vec2i tri3(i + 1, j + 1);
+
+                float v;
+                if (config["show-flow"].as<bool>()) {
+                    v = (float) (data.vortexNode.color[data.vortexNode.getIdx(tri0)]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode.color[data.vortexNode.getIdx(tri1)]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode.color[data.vortexNode.getIdx(tri2)]);
+                    fout.write((char *) (&v), 4);
+
+                    v = (float) (data.vortexNode.color[data.vortexNode.getIdx(tri1)]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode.color[data.vortexNode.getIdx(tri3)]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode.color[data.vortexNode.getIdx(tri2)]);
+                    fout.write((char *) (&v), 4);
+                } else {
+                    v = (float) (data.vortexNode[tri0]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode[tri1]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode[tri2]);
+                    fout.write((char *) (&v), 4);
+
+                    v = (float) (data.vortexNode[tri1]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode[tri3]);
+                    fout.write((char *) (&v), 4);
+                    v = (float) (data.vortexNode[tri2]);
+                    fout.write((char *) (&v), 4);
+                }
             }
         }
 
-        for (int i = 0; i < data.size.x() + 1; i++) {
-            for (int j = 0; j < data.size.y(); j++) {
-                Vec2i start_tri(i, j);
-                float v = (float) (data.vortexNode[start_tri]);
-                fout.write((char *) (&v), 4);
-                Vec2i end_tri(i, j + 1);
-                v = (float) (data.vortexNode[end_tri]);
-                fout.write((char *) (&v), 4);
-            }
-        }
+        // for (int i = 0; i < data.size.x(); i++) {
+        //     for (int j = 0; j < data.size.y() + 1; j++) {
+        //         Vec2i start_tri(i, j);
+        //         Vec2d start_pos = data.vortexNode.tri2pos(start_tri);
+        //         for (int k = 0; k < 2; k++) {
+        //             float v = (float) (start_pos[k]);
+        //             fout.write((char *) (&v), 4);
+        //         }
+        //         Vec2i end_tri(i + 1, j);
+        //         Vec2d end_pos = data.vortexNode.tri2pos(end_tri);
+        //         for (int k = 0; k < 2; k++) {
+        //             float v = (float) (end_pos[k]);
+        //             fout.write((char *) (&v), 4);
+        //         }
+        //     }
+        // }
+
+        // for (int i = 0; i < data.size.x() + 1; i++) {
+        //     for (int j = 0; j < data.size.y(); j++) {
+        //         Vec2i start_tri(i, j);
+        //         Vec2d start_pos = data.vortexNode.tri2pos(start_tri);
+        //         for (int k = 0; k < 2; k++) {
+        //             float v = (float) (start_pos[k]);
+        //             fout.write((char *) (&v), 4);
+        //         }
+        //         Vec2i end_tri(i, j + 1);
+        //         Vec2d end_pos = data.vortexNode.tri2pos(end_tri);
+        //         for (int k = 0; k < 2; k++) {
+        //             float v = (float) (end_pos[k]);
+        //             fout.write((char *) (&v), 4);
+        //         }
+        //     }
+        // }
+
+        // for (int i = 0; i < data.size.x(); i++) {
+        //     for (int j = 0; j < data.size.y() + 1; j++) {
+        //         Vec2i start_tri(i, j);
+        //         float v = (float) (data.vortexNode[start_tri]);
+        //         fout.write((char *) (&v), 4);
+        //         Vec2i end_tri(i + 1, j);
+        //         v = (float) (data.vortexNode[end_tri]);
+        //         fout.write((char *) (&v), 4);
+        //     }
+        // }
+
+        // for (int i = 0; i < data.size.x() + 1; i++) {
+        //     for (int j = 0; j < data.size.y(); j++) {
+        //         Vec2i start_tri(i, j);
+        //         float v = (float) (data.vortexNode[start_tri]);
+        //         fout.write((char *) (&v), 4);
+        //         Vec2i end_tri(i, j + 1);
+        //         v = (float) (data.vortexNode[end_tri]);
+        //         fout.write((char *) (&v), 4);
+        //     }
+        // }
     }
     updateEndFrame(ord + 1);
     myClock["plot"].stop();

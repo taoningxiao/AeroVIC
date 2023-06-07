@@ -25,16 +25,6 @@ Aero::Aero(Vec2d _origin, Vec2i _size, double _spacing):
     gen.seed(12345);
     std::uniform_real_distribution<double> dist(0, 1);
     vortex_particles.resize(size.x() * size.y() * config["particles-per-cell"].as<int>());
-    // parallelFor(0, int(size.x() * size.y()), [&](int t) {
-    //     int  i       = t % size.x();
-    //     int  j       = t / size.x();
-    //     auto ori_pos = vortexNode.tri2pos(Vec2i(i, j));
-    //     for (int k = 0; k < config["particles-per-cell"].as<int>(); k++) {
-    //         // sample.position = ori_pos + Vec2d(dist(rd), dist(rd)) * spacing;
-    //         sample.position                                                  = ori_pos + Vec2d(dist(gen), dist(gen)) * spacing;
-    //         vortex_particles[t * config["particles-per-cell"].as<int>() + k] = sample;
-    //     }
-    // });
     for (int t = 0; t < size.x() * size.y(); ++t) {
         int  i       = t % size.x();
         int  j       = t / size.x();
@@ -46,20 +36,6 @@ Aero::Aero(Vec2d _origin, Vec2i _size, double _spacing):
             vortex_particles[t * config["particles-per-cell"].as<int>() + k] = sample;
         }
     }
-    // for (int i = 0; i < size.x(); i++) {
-    //     for (int j = 0; j < size.y(); j++) {
-    //         auto ori_pos = vortexNode.tri2pos(Vec2i(i, j));
-    //         for (int k = 0; k < config["particles-per-cell"].as<int>(); k++) {
-    //             // sample.position = ori_pos + Vec2d(dist(rd), dist(rd)) * spacing;
-    //             sample.position = ori_pos + Vec2d(dist(gen), dist(gen)) * spacing;
-    //             vortex_particles.push_back(sample);
-    //         }
-    //     }
-    // }
-
-    // for (auto & particle : vortex_particles) {
-    //     if (particle.position.norm() < 0.31) particle.vortex = 1;
-    // }
 }
 
 void Aero::simulate(double dt) {
@@ -95,17 +71,6 @@ void Aero::advect(double dt) {
             // particle.color = std::abs(particle.position.y()) / (2 * spacing * size.y());
         } else particle.position = new_position;
     }
-    // std::vector<double> tmp(vortexNode.size.x() * vortexNode.size.y());
-    // for (int i = 0; i < vortexNode.size.x(); i++) {
-    //     for (int j = 0; j < vortexNode.size.y(); j++) {
-    //         Vec2d  pos                          = vortexNode.tri2pos(Vec2i(i, j));
-    //         double vecX                         = velocityX.interpolate(pos);
-    //         double vecY                         = velocityY.interpolate(pos);
-    //         Vec2d  new_pos                      = pos - Vec2d(vecX, vecY) * dt;
-    //         tmp[vortexNode.getIdx(Vec2i(i, j))] = vortexNode.interpolate(new_pos);
-    //     }
-    // }
-    // for (int i = 0; i < vortexNode.size.x() * vortexNode.size.y(); i++) vortexNode.scalarV[i] = tmp[i];
     myClock["simulate/advect"].stop();
 }
 
@@ -143,18 +108,6 @@ void Aero::vortexP2G(double dt) {
 
         double w = 0;
 
-        // for (int particleIdx = 0; particleIdx < vortex_particles.size(); particleIdx++) {
-        //     auto & particle = vortex_particles[particleIdx];
-        //     double v        = kernel((particle.position - cur_pos).x()) * kernel((particle.position - cur_pos).y());
-        //     vortexNode.scalarV[idx] += v * particle.vortex;
-        //     w += v;
-        //     if (v != 0) {
-        //         auto it = std::find(grid_particles[idx].begin(), grid_particles[idx].end(), particleIdx);
-        //         if (it == grid_particles[idx].end()) {
-        //             std::cout << fmt::format("Error: Particle {} which locate at ({}, {}) not in grid_particles[{}] which locate at ({}, {})\n", particleIdx, particle.position.x(), particle.position.y(), idx, cur_pos.x(), cur_pos.y());
-        //         }
-        //     }
-        // }
         for (const auto & particleIdx : grid_particles[idx]) {
             auto & particle = vortex_particles[particleIdx];
             vortexNode.scalarV[idx] += kernel((particle.position - cur_pos).norm()) * particle.vortex;
@@ -176,27 +129,6 @@ void Aero::diffusion(double dt) {
     myClock["simulate/diffusion"].start();
     double coe = config["viscous-coe"].as<double>();
 
-    // std::vector<double> tmp(vortexNode.scalarV.size());
-    // for (int i = 0; i < vortexNode.scalarV.size(); i++) tmp[i] = vortexNode.scalarV[i];
-
-    // for (int i = 1; i < vortexNode.size.x() - 1; i++) {
-    //     for (int j = 1; j < vortexNode.size.y() - 1; j++) {
-    //         int cur_idx = vortexNode.getIdx(Vec2i(i, j));
-
-    //         Vec2i tri_right, tri_left;
-    //         Vec2i tri_up, tri_down;
-    //         tri_right     = Vec2i(i + 1, j);
-    //         tri_left      = Vec2i(i - 1, j);
-    //         tri_up        = Vec2i(i, j + 1);
-    //         tri_down      = Vec2i(i, j - 1);
-    //         int idx_right = vortexNode.getIdx(tri_right);
-    //         int idx_left  = vortexNode.getIdx(tri_left);
-    //         int idx_up    = vortexNode.getIdx(tri_up);
-    //         int idx_down  = vortexNode.getIdx(tri_down);
-
-    //         vortexNode.scalarV[cur_idx] += coe * dt * (tmp[idx_right] + tmp[idx_left] + tmp[idx_up] + tmp[idx_down] - 4 * tmp[cur_idx]) / (spacing * spacing);
-    //     }
-    // }
     int num = vortexNode.scalarV.size();
 
     Eigen::VectorXd rhs(num);
@@ -417,24 +349,10 @@ void Aero::calVortex(double dt) {
     std::fill(vortex_change.begin(), vortex_change.end(), 0);
     for (int i = 1; i < vortexNode.size.x() - 1; i++) {
         for (int j = 1; j < vortexNode.size.y() - 1; j++) {
-            // Vec2d pos_right = vortexNode.tri2pos(Vec2i(i, j)) + Vec2d(0.5, 0) * spacing;
-            // Vec2d pos_left  = vortexNode.tri2pos(Vec2i(i, j)) + Vec2d(-0.5, 0) * spacing;
-            // Vec2i tri_right, tri_left;
-            // if (inside(pos_right)) tri_right = velocityY.pos2tri(pos_right);
-            // else tri_right = Vec2i(-1, -1);
-            // if (inside(pos_left)) tri_left = velocityY.pos2tri(pos_left);
-            // else tri_left = Vec2i(-1, -1);
             Vec2i  tri_left  = Vec2i(i - 1, j);
             Vec2i  tri_right = Vec2i(i, j);
             double gradY     = (velocityY[tri_right] - velocityY[tri_left]) / spacing;
 
-            // Vec2d pos_up   = vortexNode.tri2pos(Vec2i(i, j)) + Vec2d(0, 0.5) * spacing;
-            // Vec2d pos_down = vortexNode.tri2pos(Vec2i(i, j)) + Vec2d(0, -0.5) * spacing;
-            // Vec2i tri_up, tri_down;
-            // if (inside(pos_up)) tri_up = velocityX.pos2tri(pos_up);
-            // else tri_up = Vec2i(-1, -1);
-            // if (inside(pos_down)) tri_down = velocityX.pos2tri(pos_down);
-            // else tri_down = Vec2i(-1, -1);
             Vec2i  tri_down = Vec2i(i, j - 1);
             Vec2i  tri_up   = Vec2i(i, j);
             double gradX    = (velocityX[tri_up] - velocityX[tri_down]) / spacing;
@@ -460,19 +378,6 @@ void Aero::vortexG2P(double dt) {
             change += kernel((particle.position - vortexNode.tri2pos(tri)).norm()) * vortex_change[cur_idx];
             w += kernel((particle.position - vortexNode.tri2pos(tri)).norm());
         }
-        // for (int i = 0; i < vortexNode.size.x(); i++) {
-        //     for (int j = 0; j < vortexNode.size.y(); j++) {
-        //         double v = kernel((particle.position - vortexNode.tri2pos(Vec2i(i, j))).x()) * kernel((particle.position - vortexNode.tri2pos(Vec2i(i, j))).y());
-        //         particle.vortex += v * vortexNode[Vec2i(i, j)];
-        //         w += v;
-        //         if (v != 0) {
-        //             auto it = std::find(particle_grids[idx].begin(), particle_grids[idx].end(), Vec2i(i, j));
-        //             if (it == particle_grids[idx].end()) {
-        //                 std::cout << fmt::format("Error: Grid ({}, {}) not in particle_grids[{}]\n", i, j, idx);
-        //             }
-        //         }
-        //     }
-        // }
         if (w != 0) change /= w;
         if (std::abs(change) < EPS) change = 0;
         particle.vortex += change;

@@ -1,24 +1,26 @@
 # grid setting
-width: 8
-height: 4
-spacing: 0.01
+width: 6
+height: 3
+spacing: 0.04
 
 # simulation setting
 time-step: 0.01
-simulation-time: 50.0
+simulation-time: 30.0
 particles-per-cell: 10
 
 # viewer setting
 dimension: 2
 fps: 30
-show-vortex-particle: true
+show-vortex-particle: false
 show-grid: true
+show-flow: true
 show-velX-grid: false
 show-velY-grid: false
 
 # boundary setting
-radius: 0.3
-u-far: 1.0
+radius: 0.15
+u-far: 0.5
+kernel-radius: 0.2
 
 # force setting
-viscous-coe: 0.004
+viscous-coe: 0.015
